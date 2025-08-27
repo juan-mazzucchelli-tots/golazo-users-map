@@ -90,16 +90,43 @@ fetch(`${API_BASE_URL}/external/users-map`, {
   const validUsers = users.filter(u => u.location?.latitude && u.location?.longitude);
 
   validUsers.forEach(user => {
-    const createMarker = (lat, lng, isTraining = true) => {
-      const popupHtml = `
-        <b>${user.name || 'Sin nombre'}</b><br>
-        Role: ${user.role || 'N/A'}<br>
-        ${isTraining ? 'Entrenando en:<br>' : 'Ubicación:<br>'} 
-        ${user.location.address || 'N/A'}
-        <br>
-        Email: ${user.email || 'N/A'}<br>
-        Tel: ${user.phone || 'N/A'}
-      `;
+    const createMarker = (lat, lng, isTraining = true, slotAddress = null) => {
+      const address = slotAddress || user.location?.address || 'N/A';
+      let popupHtml = '';
+      
+      if (user.role === 'coach') {
+        popupHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 250px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">Coach: ${user.name || 'Sin nombre'}</div>
+            <div style="margin-bottom: 8px;">
+              ${isTraining ? '⚽ Training location' : '👤 Profile location'}<br>
+              ${!isTraining && user.schedule_slots?.length === 0 ? '<span style="color: #666; font-style: italic;">*No recurrent sessions registered*<br></span>' : ''}
+              ${address}
+            </div>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 8px 0;">
+            <div>
+              <strong>Email:</strong> ${user.email || 'N/A'}<br>
+              <strong>Tel:</strong> ${user.phone || 'N/A'}
+            </div>
+          </div>
+        `;
+      } else {
+        // For players/parents
+        popupHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 250px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">${user.role === 'player' ? 'Player' : 'Parent'}: ${user.name || 'Sin nombre'}</div>
+            <div style="margin-bottom: 8px;">
+              👤 Profile location<br>
+              ${address}
+            </div>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 8px 0;">
+            <div>
+              <strong>Email:</strong> ${user.email || 'N/A'}<br>
+              <strong>Tel:</strong> ${user.phone || 'N/A'}
+            </div>
+          </div>
+        `;
+      }
 
       const marker = L.marker([lat, lng], { 
         icon: getMarkerIcon(user, isTraining), 
@@ -118,7 +145,7 @@ fetch(`${API_BASE_URL}/external/users-map`, {
         // Create a marker for each training location
         user.schedule_slots.forEach(slot => {
           if (slot.location?.latitude && slot.location?.longitude) {
-            createMarker(slot.location.latitude, slot.location.longitude, true);
+            createMarker(slot.location.latitude, slot.location.longitude, true, slot.location?.address);
           }
         });
       } else if (user.location?.latitude && user.location?.longitude) {
