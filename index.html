@@ -19,6 +19,7 @@
   }
   .pink-badge {    background:#ff4fa3;  }
   .blue-badge {    background: #1e90ff;  }
+  .gray-badge {   background: #9e9e9e; }
 
   .neutral-badge {
     background-color: #4caf50;
@@ -41,7 +42,7 @@
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
 
 <script>
-const API_BASE_URL = "https://production-dot-driven-bulwark-437601-n2.uw.r.appspot.com/api";
+const API_BASE_URL = "http://localhost:8000/api";
 const apiKey = new URLSearchParams(window.location.search).get("api_key");
 
 if (!apiKey) alert("Falta el parámetro api_key en la URL");
@@ -69,8 +70,11 @@ const markersCluster = L.markerClusterGroup({
   }
 });
 
-function getMarkerIcon(user) {
-  const colorClass = (user.role === 'coach') ? 'badge pink-badge' : 'badge blue-badge';
+function getMarkerIcon(user, isTraining = true) {
+  let colorClass = 'badge blue-badge';
+  if (user.role === 'coach') {
+    colorClass = isTraining ? 'badge pink-badge' : 'badge gray-badge';
+  }
   return L.divIcon({
     html: `<div class="${colorClass}">•</div>`,
     className: '',
@@ -86,21 +90,42 @@ fetch(`${API_BASE_URL}/external/users-map`, {
   const validUsers = users.filter(u => u.location?.latitude && u.location?.longitude);
 
   validUsers.forEach(user => {
-    const lat = user.location.latitude;
-    const lng = user.location.longitude;
+    const createMarker = (lat, lng, isTraining = true) => {
+      const popupHtml = `
+        <b>${user.name || 'Sin nombre'}</b><br>
+        Role: ${user.role || 'N/A'}<br>
+        ${isTraining ? 'Entrenando en:<br>' : 'Ubicación:<br>'} 
+        ${user.location.address || 'N/A'}
+        <br>
+        Email: ${user.email || 'N/A'}<br>
+        Tel: ${user.phone || 'N/A'}
+      `;
 
-    const popupHtml = `
-      <b>${user.name || 'Sin nombre'}</b><br>
-      Role: ${user.role || 'N/A'}<br>
-      Email: ${user.email || 'N/A'}<br>
-      Tel: ${user.phone || 'N/A'}<br>
-      Dirección: ${user.location.address || 'N/A'}
-    `;
+      const marker = L.marker([lat, lng], { 
+        icon: getMarkerIcon(user, isTraining), 
+        role: user.role 
+      }).bindPopup(popupHtml);
 
-    const marker = L.marker([lat, lng], { icon: getMarkerIcon(user), role: user.role })
-      .bindPopup(popupHtml);
+      markersCluster.addLayer(marker);
+    };
 
-    markersCluster.addLayer(marker);
+    // For players/parents, create a single marker as before
+    if (user.role !== 'coach') {
+      createMarker(user.location.latitude, user.location.longitude);
+    } else {
+      // For coaches, create markers for each schedule slot
+      if (user.schedule_slots && user.schedule_slots.length > 0) {
+        // Create a marker for each training location
+        user.schedule_slots.forEach(slot => {
+          if (slot.location?.latitude && slot.location?.longitude) {
+            createMarker(slot.location.latitude, slot.location.longitude, true);
+          }
+        });
+      } else if (user.location?.latitude && user.location?.longitude) {
+        // If no schedule slots, create a single marker using user's location
+        createMarker(user.location.latitude, user.location.longitude, false);
+      }
+    }
   });
 
   map.addLayer(markersCluster);
