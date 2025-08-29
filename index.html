@@ -87,9 +87,8 @@ fetch(`${API_BASE_URL}/external/users-map`, {
 })
 .then(res => res.json())
 .then(users => {
-  const validUsers = users.filter(u => u.location?.latitude && u.location?.longitude);
 
-  validUsers.forEach(user => {
+  users.forEach(user => {
     const createMarker = (lat, lng, isTraining = true, slotAddress = null) => {
       const address = slotAddress || user.location?.address || 'N/A';
       let popupHtml = '';
@@ -156,10 +155,6 @@ fetch(`${API_BASE_URL}/external/users-map`, {
   });
 
   map.addLayer(markersCluster);
-
-  if (validUsers.length) {
-    const group = new L.featureGroup(validUsers.map(u => L.marker([u.location.latitude, u.location.longitude])));
-  }
 })
 .catch(err => {
   console.error("Error cargando usuarios:", err);
